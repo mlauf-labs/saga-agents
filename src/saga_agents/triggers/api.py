@@ -106,7 +106,7 @@ def build_api(
         if proposal_store is None:
             return JSONResponse({"error": "proposals disabled"}, status_code=503)
         record = await proposal_store.get(proposal_id)
-        if record is None:
+        if record is None or record.status != "pending":
             raise HTTPException(status_code=404, detail=f"Proposal not found: {proposal_id}")
         await proposal_store.set_status(proposal_id, "rejected")
         return JSONResponse({"status": "rejected"})

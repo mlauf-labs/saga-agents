@@ -126,12 +126,16 @@ def test_build_api_accepts_proposal_store_none() -> None:
     assert app is not None
 
 
-def test_build_api_accepts_proposal_store_object() -> None:
-    """build_api is callable with a SqliteProposalStore (demonstrates typed store param)."""
-    # Passing None is sufficient to verify the optional param type; a real store
-    # requires an async init, so we just confirm the API accepts None without error.
-    app = build_api(_stub(), {}, expected_token="t", proposal_store=None)
-    assert app is not None
+async def test_build_api_accepts_proposal_store_object(tmp_path: Path) -> None:
+    """build_api is callable with a real SqliteProposalStore instance."""
+    store = SqliteProposalStore(str(tmp_path / "p.db"))
+    await store.init()
+    app = build_api(_stub(), {}, expected_token="t", proposal_store=store)
+    from fastapi import FastAPI
+
+    assert isinstance(app, FastAPI)
+    client = TestClient(app)
+    assert client.get("/healthz").status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -290,6 +294,25 @@ async def test_reject_missing_proposal_returns_404(tmp_path: Path) -> None:
         "/proposals/nonexistent/reject", headers={"Authorization": "Bearer t"}
     )
     assert response.status_code == 404
+
+
+async def test_reject_non_pending_proposal_returns_404(tmp_path: Path) -> None:
+    """POST /proposals/{id}/reject returns 404 when proposal is not pending (e.g. applied)."""
+    store = await _make_store(tmp_path)
+    proposal_id = await _seed_proposal(store)
+    # Move the proposal to 'applied' so it is no longer pending
+    await store.set_status(proposal_id, "applied")
+
+    client = TestClient(build_api(_stub(), {}, expected_token="t", proposal_store=store))
+    response = client.post(
+        f"/proposals/{proposal_id}/reject", headers={"Authorization": "Bearer t"}
+    )
+    assert response.status_code == 404
+
+    # Status must remain 'applied' — reject must not overwrite it
+    stored = await store.get(proposal_id)
+    assert stored is not None
+    assert stored.status == "applied"
 
 
 async def test_approve_requires_token(tmp_path: Path) -> None:

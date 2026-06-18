@@ -226,9 +226,12 @@ class SqliteProposalStore:
             error: Optional error message to store alongside the status change.
         """
         async with aiosqlite.connect(self._db_path) as db:
-            await db.execute(
+            cursor = await db.execute(
                 "UPDATE proposals SET status = ?, error = ? WHERE id = ?",
                 (status, error, proposal_id),
             )
             await db.commit()
-        log.info("proposal_status_updated", proposal_id=proposal_id, status=status)
+        if cursor.rowcount == 0:
+            log.warning("proposal_status_update_no_match", proposal_id=proposal_id, status=status)
+        else:
+            log.info("proposal_status_updated", proposal_id=proposal_id, status=status)
