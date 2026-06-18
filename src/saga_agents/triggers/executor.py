@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import Any
 
 from saga_agents.config.models import AgentDefinition
@@ -11,6 +12,14 @@ from saga_agents.runtime.runner import AgentRunner
 from saga_agents.triggers.base import RunRequest
 
 log = get_logger(__name__)
+
+# Lua script for ownership-guarded compare-and-delete.
+# Deletes the key only when its value matches the caller's token.
+_LUA_COMPARE_AND_DELETE = (
+    "if redis.call('get', KEYS[1]) == ARGV[1] then "
+    "return redis.call('del', KEYS[1]) "
+    "else return 0 end"
+)
 
 
 class RunExecutor:
@@ -69,14 +78,16 @@ class RunExecutor:
 
         agent_id = req.agent_id
         lock_key = f"agent:lock:{agent_id}"
+        lock_token: str | None = None
 
         async with self._global_sem:
             async with self._agent_sems[agent_id]:
                 # Optional Redis advisory lock (cross-process deduplication).
                 if self._redis is not None:
+                    lock_token = uuid.uuid4().hex
                     acquired: Any = await self._redis.set(  # noqa: ANN401
                         lock_key,
-                        "1",
+                        lock_token,
                         nx=True,
                         ex=definition.limits.timeout_seconds,
                     )
@@ -99,8 +110,11 @@ class RunExecutor:
                     )
                     return
                 finally:
-                    if self._redis is not None:
-                        await self._redis.delete(lock_key)
+                    if self._redis is not None and lock_token is not None:
+                        try:
+                            await self._redis.eval(_LUA_COMPARE_AND_DELETE, 1, lock_key, lock_token)
+                        except Exception:  # noqa: BLE001
+                            pass  # best-effort release
 
                 log.info(
                     "run_completed",

@@ -220,7 +220,7 @@ async def test_redis_advisory_lock_skips_when_locked() -> None:
     class FakeRedis:
         def __init__(self) -> None:
             self.set_calls: int = 0
-            self.delete_calls: int = 0
+            self.eval_calls: int = 0
 
         async def set(
             self,
@@ -233,8 +233,9 @@ async def test_redis_advisory_lock_skips_when_locked() -> None:
             self.set_calls += 1
             return None  # simulate lock already held
 
-        async def delete(self, key: str) -> None:
-            self.delete_calls += 1
+        async def eval(self, script: str, numkeys: int, *args: Any) -> Any:
+            self.eval_calls += 1
+            return 0
 
     defn = _make_definition("locked-agent")
     stub = StubRunner()
@@ -250,18 +251,22 @@ async def test_redis_advisory_lock_skips_when_locked() -> None:
 
     assert stub.called == []
     assert fake_redis.set_calls == 1
-    # delete should NOT be called because we returned before acquiring
-    assert fake_redis.delete_calls == 0
+    # eval/delete should NOT be called because we returned before acquiring
+    assert fake_redis.eval_calls == 0
 
 
 @pytest.mark.asyncio
 async def test_redis_advisory_lock_releases_after_run() -> None:
-    """When the Redis lock is acquired, it is released (deleted) after run completion."""
+    """When the Redis lock is acquired, it is released via compare-and-delete after run."""
+
+    stored_token: dict[str, str] = {}
 
     class FakeRedis:
         def __init__(self) -> None:
             self.set_calls: int = 0
-            self.delete_calls: int = 0
+            self.eval_calls: int = 0
+            self.eval_key: str | None = None
+            self.eval_token: str | None = None
 
         async def set(
             self,
@@ -272,10 +277,14 @@ async def test_redis_advisory_lock_releases_after_run() -> None:
             ex: int = 0,
         ) -> Any:
             self.set_calls += 1
+            stored_token[key] = value  # record the token that was set
             return True  # lock acquired
 
-        async def delete(self, key: str) -> None:
-            self.delete_calls += 1
+        async def eval(self, script: str, numkeys: int, *args: Any) -> Any:
+            self.eval_calls += 1
+            self.eval_key = args[0]
+            self.eval_token = args[1]
+            return 1
 
     defn = _make_definition("unlocked-agent")
     stub = StubRunner()
@@ -291,4 +300,76 @@ async def test_redis_advisory_lock_releases_after_run() -> None:
 
     assert stub.called == ["unlocked-agent"]
     assert fake_redis.set_calls == 1
-    assert fake_redis.delete_calls == 1
+    # ownership-guarded release: eval called exactly once
+    assert fake_redis.eval_calls == 1
+    # the token passed to eval must match the token stored at acquire time
+    lock_key = "agent:lock:unlocked-agent"
+    assert fake_redis.eval_key == lock_key
+    assert fake_redis.eval_token == stored_token[lock_key]
+
+
+@pytest.mark.asyncio
+async def test_redis_advisory_lock_does_not_delete_foreign_lock() -> None:
+    """If the lock key is no longer owned (expired and re-acquired), eval does not delete it."""
+
+    class FakeRedis:
+        """Simulates a Redis where the lock key holds a different token (re-acquired by another run)."""
+
+        def __init__(self) -> None:
+            self.eval_calls: int = 0
+            self.eval_token_passed: str | None = None
+            self._store: dict[str, str] = {}
+
+        async def set(
+            self,
+            key: str,
+            value: str,
+            *,
+            nx: bool = False,
+            ex: int = 0,
+        ) -> Any:
+            self._store[key] = value
+            return True
+
+        async def eval(self, script: str, numkeys: int, *args: Any) -> Any:
+            self.eval_calls += 1
+            self.eval_token_passed = args[1]
+            key = args[0]
+            token = args[1]
+            # Simulate another process having replaced the lock value
+            current = self._store.get(key)
+            if current == token:
+                del self._store[key]
+                return 1
+            return 0  # token mismatch — do not delete
+
+    defn = _make_definition("ownership-agent")
+    stub = StubRunner()
+    fake_redis = FakeRedis()
+    executor = RunExecutor(
+        stub,  # type: ignore[arg-type]
+        {"ownership-agent": defn},
+        global_limit=2,
+        redis=fake_redis,
+    )
+
+    # Corrupt the lock between acquire and release to simulate expiry+re-acquire
+    original_run = stub.run
+
+    async def run_and_corrupt(
+        definition: AgentDefinition, *, prompt: str | None = None
+    ) -> RunReport:
+        # Replace the stored token with a foreign value mid-run
+        key = f"agent:lock:{definition.id}"
+        fake_redis._store[key] = "foreign-token"
+        return await original_run(definition)
+
+    stub.run = run_and_corrupt  # type: ignore[method-assign]
+
+    await executor.submit(RunRequest(agent_id="ownership-agent", reason="test"))
+
+    assert stub.called == ["ownership-agent"]
+    # eval was called, but returned 0 (no delete) because token didn't match
+    assert fake_redis.eval_calls == 1
+    # the foreign token must NOT have been deleted
+    assert fake_redis._store.get("agent:lock:ownership-agent") == "foreign-token"
