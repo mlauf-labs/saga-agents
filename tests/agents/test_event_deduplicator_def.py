@@ -1,7 +1,7 @@
 """Load and validate the event-deduplicator agent definition."""
 
 from saga_agents.config.loader import load_agent_files
-from saga_agents.config.models import AgentDefinition
+from saga_agents.config.models import AgentDefinition, EventTrigger
 
 
 def test_event_deduplicator_loads() -> None:
@@ -30,3 +30,13 @@ def test_both_agents_load_without_duplicate_id() -> None:
     assert "event-deduplicator" in ids
     assert "re-categorizer" in ids
     assert len(ids) == len(set(ids)), "Duplicate agent ids found"
+
+
+def test_event_deduplicator_event_trigger() -> None:
+    defs: dict[str, AgentDefinition] = {d.id: d for d in load_agent_files("config/agents")}
+    d = defs["event-deduplicator"]
+    event_triggers = [t for t in d.triggers if isinstance(t, EventTrigger)]
+    assert len(event_triggers) == 1, "Expected exactly one EventTrigger"
+    et = event_triggers[0]
+    assert "document.ingested" in et.topics
+    assert et.debounce_minutes == 15

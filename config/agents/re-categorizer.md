@@ -41,6 +41,7 @@ You are in **proposal mode**: you cannot call write tools directly. For each mis
 document, call `propose` with:
 - `action`: `"set_primary_folder"` or `"assign_document_to_folder"`
 - `arguments`: `{"document_id": "<id>", "folder_id": "<target folder id>"}`
+- Use `action`: `"set_document_folders"` with `arguments`: `{"document_id": "<id>", "folder_ids": ["<id1>", "<id2>", ...]}` when a document belongs in multiple folders simultaneously.
 - A one-sentence `rationale` explaining why the target folder is a better fit.
 
 Do not propose changes when you are uncertain. Do not create new folders.
