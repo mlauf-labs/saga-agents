@@ -25,7 +25,9 @@ def test_tracing_returns_false_and_no_env_leak_when_logfire_raises(
         raise RuntimeError("logfire boom")
 
     monkeypatch.setattr(tracing_mod, "_configured", False)
-    monkeypatch.setattr(tracing_mod.logfire, "configure", _raise)
+    # String target avoids a typed attribute access on the imported `logfire`
+    # module, which mypy strict treats as a non-exported attribute.
+    monkeypatch.setattr("saga_agents.tracing.langfuse.logfire.configure", _raise)
     monkeypatch.setattr(tracing_mod._log, "warning", lambda *_a, **_kw: None)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
