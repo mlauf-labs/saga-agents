@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 from saga_agents.config.models import AgentDefinition, Limits, ToolsSpec
 from saga_agents.proposals.store import ProposalRecord, SqliteProposalStore
@@ -332,3 +333,48 @@ async def test_reject_requires_token(tmp_path: Path) -> None:
     client = TestClient(build_api(_stub(), {}, expected_token="t", proposal_store=store))
     response = client.post(f"/proposals/{proposal_id}/reject")
     assert response.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: non-JSON-serializable MCP result must not flip status to failed
+# ---------------------------------------------------------------------------
+
+
+class _PydanticResult(BaseModel):
+    """A structured (non-dict) Pydantic model returned by a fake MCP call."""
+
+    merged: str
+    count: int
+
+
+async def test_approve_non_json_native_result_returns_200_and_applied(
+    tmp_path: Path,
+) -> None:
+    """POST approve with a Pydantic-model MCP result must return 200 and store 'applied'.
+
+    Guards against the regression where JSONResponse serialization of a non-dict
+    result would raise AFTER set_status("applied"), and the except branch would
+    then wrongly overwrite the status with 'failed'.
+    """
+    store = await _make_store(tmp_path)
+    proposal_id = await _seed_proposal(store)
+
+    async def pydantic_mcp(action: str, args: dict[str, Any]) -> _PydanticResult:
+        return _PydanticResult(merged="yes", count=3)
+
+    client = TestClient(
+        build_api(_stub(), {}, expected_token="t", proposal_store=store, mcp_call=pydantic_mcp)
+    )
+    response = client.post(
+        f"/proposals/{proposal_id}/approve", headers={"Authorization": "Bearer t"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "applied"
+    # The result must have been coerced to a JSON-safe form
+    assert body["result"] is not None
+
+    # Critically: stored status must be 'applied', NOT 'failed'
+    stored = await store.get(proposal_id)
+    assert stored is not None
+    assert stored.status == "applied"

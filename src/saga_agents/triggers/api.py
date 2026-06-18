@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from saga_agents.config.models import AgentDefinition
@@ -92,11 +93,15 @@ def build_api(
             raise HTTPException(status_code=404, detail=f"Proposal not found: {proposal_id}")
         try:
             result = await apply_proposal(record, mcp_call)
-            await proposal_store.set_status(proposal_id, "applied")
-            return JSONResponse({"status": "applied", "result": result})
         except Exception as exc:  # noqa: BLE001
             await proposal_store.set_status(proposal_id, "failed", error=str(exc))
             return JSONResponse({"error": str(exc)}, status_code=500)
+        await proposal_store.set_status(proposal_id, "applied")
+        try:
+            safe_result = jsonable_encoder(result)
+        except Exception:  # noqa: BLE001
+            safe_result = str(result)
+        return JSONResponse({"status": "applied", "result": safe_result})
 
     @app.post("/proposals/{proposal_id}/reject")
     async def reject_proposal(
