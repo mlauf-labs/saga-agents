@@ -1,0 +1,42 @@
+[project]
+name = "saga-agents"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic-ai-slim[openai,mcp]>=0.1.0",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+    "redis>=5.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "apscheduler>=3.10",
+    "aiosqlite>=0.20",
+    "logfire>=0.50",
+    "structlog>=24.1",
+]
+
+[project.scripts]
+saga-agents = "saga_agents.app:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "mypy>=1.10", "ruff>=0.5"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/saga_agents"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
