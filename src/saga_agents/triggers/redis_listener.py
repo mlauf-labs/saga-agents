@@ -214,16 +214,32 @@ class RedisListener:
         """Periodically check debouncers and submit due runs."""
         while True:
             await asyncio.sleep(_TICK_INTERVAL)
-            for state in self._states:
-                if state.debouncer.due():
-                    state.debouncer.reset()
-                    req = RunRequest(
-                        agent_id=state.agent_id,
-                        reason=f"event:{state.last_topic}",
-                    )
-                    log.debug(
-                        "debouncer_fired agent_id=%s reason=%s",
+            await self._check_due_and_dispatch()
+
+    async def _check_due_and_dispatch(self) -> None:
+        """Check every debouncer and submit a RunRequest for each due agent.
+
+        Extracted from the tick loop so that tests can drive a single iteration
+        without mocking :func:`asyncio.sleep`.
+        """
+        for state in self._states:
+            if state.debouncer.due():
+                state.debouncer.reset()
+                req = RunRequest(
+                    agent_id=state.agent_id,
+                    reason=f"event:{state.last_topic}",
+                )
+                log.debug(
+                    "debouncer_fired agent_id=%s reason=%s",
+                    state.agent_id,
+                    req.reason,
+                )
+                try:
+                    await self._executor.submit(req)
+                except Exception as exc:  # noqa: BLE001
+                    log.error(
+                        "tick_loop_submit_error agent_id=%s reason=%s error=%s",
                         state.agent_id,
                         req.reason,
+                        exc,
                     )
-                    await self._executor.submit(req)

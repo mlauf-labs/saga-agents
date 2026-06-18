@@ -70,16 +70,6 @@ def test_re_armed_after_reset_and_new_mark() -> None:
     assert d.due() is True
 
 
-def test_exactly_at_boundary_not_due() -> None:
-    """At exactly *delay_seconds* elapsed the debouncer is not yet due (strictly less-than)."""
-    now = [0.0]
-    d = Debouncer(10.0, clock=lambda: now[0])
-    d.mark()
-    now[0] = 10.0
-    # clock() - last_mark == 10.0 which is >= 10.0 so it IS due
-    assert d.due() is True
-
-
 def test_due_exact_boundary() -> None:
     """At exactly delay_seconds the debouncer is due (>= semantics)."""
     now = [0.0]
