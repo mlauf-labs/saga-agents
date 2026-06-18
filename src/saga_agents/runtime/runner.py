@@ -18,7 +18,14 @@ from saga_agents.runtime.propose import build_propose_tool
 from saga_agents.runtime.report import RunDeps, RunReport, RunStatus
 from saga_agents.runtime.toolset import build_mcp_server, filtered_server, visible_tool_names
 
-logger = logging.getLogger(__name__)
+
+def get_logger(name: str) -> logging.Logger:
+    """Return a stdlib logger for *name*."""
+    return logging.getLogger(name)
+
+
+log = get_logger("saga_agents.runtime.runner")
+logger = log  # keep module-level ``logger`` alias for existing callers
 
 
 class ProposalSink(Protocol):
@@ -52,8 +59,8 @@ def _count_tool_calls(result: Any) -> int:
                     name = getattr(part, "tool_name", None)
                     if name != "propose":
                         count += 1
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        log.warning("count_tool_calls_failed error=%s", exc)
     return count
 
 
@@ -142,8 +149,10 @@ class AgentRunner:
             tool_calls = _count_tool_calls(result)
             error = None
         except UsageLimitExceeded as exc:
+            # tool_calls=0: result was never assigned, so no reliable count is available
             status, summary, tool_calls, error = RunStatus.LIMIT_EXCEEDED, "", 0, str(exc)
         except TimeoutError:
+            # tool_calls=0: result was never assigned, so no reliable count is available
             status, summary, tool_calls, error = (
                 RunStatus.TIMEOUT,
                 "",
@@ -151,9 +160,11 @@ class AgentRunner:
                 f"Run exceeded {limits.timeout_seconds}s",
             )
         except Exception as exc:  # noqa: BLE001
+            # tool_calls=0: result was never assigned, so no reliable count is available
             status, summary, tool_calls, error = RunStatus.ERROR, "", 0, str(exc)
 
         # 7. Persist proposals (proposal mode only)
+        persistence_error: str | None = None
         if is_proposal_mode and self._proposal_sink is not None:
             for p in deps.proposals:
                 try:
@@ -165,11 +176,17 @@ class AgentRunner:
                         rationale=p.rationale,
                     )
                 except Exception as sink_exc:  # noqa: BLE001
+                    persistence_error = str(sink_exc)
                     logger.warning(
                         "ProposalSink.add failed for run %s: %s",
                         run_id,
                         sink_exc,
                     )
+
+        # Surface persistence degradation in the summary so callers see it
+        # without changing status/error semantics.
+        if persistence_error is not None and status == RunStatus.OK:
+            summary = f"{summary}\n[warning: proposal persistence degraded: {persistence_error}]"
 
         # 8. Return report
         return RunReport(

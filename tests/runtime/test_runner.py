@@ -150,3 +150,57 @@ async def test_runner_proposal_mode_persists(
     assert len(sink.calls) == 1
     assert sink.calls[0]["agent_id"] == proposal_definition.id
     assert sink.calls[0]["action"] == "delete_doc"
+
+
+class FailingSink:
+    """ProposalSink whose add() always raises, to test degradation surfacing."""
+
+    async def add(
+        self,
+        agent_id: str,
+        run_id: str,
+        action: str,
+        arguments: dict[str, Any],
+        rationale: str,
+    ) -> object:
+        raise RuntimeError("db unavailable")
+
+
+@pytest.mark.asyncio
+async def test_runner_proposal_sink_failure_surfaces_in_summary(
+    global_config: GlobalConfig,
+    proposal_definition: AgentDefinition,
+) -> None:
+    """Proposal-mode run where sink.add raises: status stays OK, summary contains degradation note."""
+    call_count: dict[str, int] = {"n": 0}
+
+    def proposal_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        tool_name="propose",
+                        args={
+                            "action": "delete_doc",
+                            "arguments": {"doc_id": "xyz"},
+                            "rationale": "outdated document",
+                        },
+                    )
+                ]
+            )
+        return ModelResponse(parts=[TextPart(content="proposals submitted")])
+
+    runner = AgentRunner(
+        global_config,
+        proposal_sink=FailingSink(),
+        mcp_server_factory=_empty_toolset_factory,
+        model_factory=lambda *a, **k: FunctionModel(proposal_fn),
+    )
+    report = await runner.run(proposal_definition)
+
+    # Must not raise; status stays OK despite sink failure
+    assert report.status == RunStatus.OK
+    assert report.error is None
+    # Degradation note must appear in summary
+    assert "persistence degraded" in report.summary
