@@ -10,45 +10,36 @@ Usage::
 
 from __future__ import annotations
 
-import logging
 import sys
+from typing import Any
 
 import structlog
 
-_configured = False
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer(),
+    ],
+    logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+    cache_logger_on_first_use=True,
+)
 
 
-def _configure() -> None:
-    global _configured
-    if _configured:
-        return
-    _configured = True
-
-    structlog.configure(
-        processors=[
-            structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.StackInfoRenderer(),
-            structlog.processors.format_exc_info,
-            structlog.processors.JSONRenderer(),
-        ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG),
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
-        cache_logger_on_first_use=True,
-    )
-
-
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str) -> Any:
     """Return a structlog bound logger configured for JSON output.
+
+    The logger name is injected as a bound context value (key ``"logger"``)
+    rather than via ``add_logger_name``, which requires a stdlib logger with a
+    ``.name`` attribute.  ``PrintLogger`` has no such attribute, so
+    ``add_logger_name`` raises ``AttributeError`` under pytest.  Binding the
+    name explicitly avoids that entirely.
 
     Args:
         name: Logger name, e.g. ``"saga_agents.runtime.runner"``.
 
     Returns:
-        A structlog bound logger instance.
+        A structlog bound logger with ``logger=name`` pre-bound.
     """
-    _configure()
-    logger: structlog.stdlib.BoundLogger = structlog.get_logger(name)
-    return logger
+    return structlog.get_logger().bind(logger=name)
