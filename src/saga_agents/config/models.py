@@ -21,7 +21,7 @@ class EventTrigger(BaseModel):
     """Fire when one of the listed saga events is emitted."""
 
     type: Literal["event"]
-    on: list[str]
+    topics: list[str]
     debounce_minutes: int = 0
 
 
@@ -60,9 +60,7 @@ class ToolsSpec(BaseModel):
         allow: list[str] = info.data.get("allow", [])
         extra = set(write) - set(allow)
         if extra:
-            raise ConfigError(
-                f"ToolsSpec.write contains tools not in allow: {sorted(extra)}"
-            )
+            raise ConfigError(f"ToolsSpec.write contains tools not in allow: {sorted(extra)}")
         return write
 
 

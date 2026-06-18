@@ -24,7 +24,7 @@ tools:
   write: [update_event]
 triggers:
   - type: event
-    "on": [document.ingested]   # quotes around "on" are required — YAML keyword
+    topics: [document.ingested]
     debounce_minutes: 10
   - type: schedule
     cron: "0 3 * * *"
@@ -39,9 +39,6 @@ limits:
 You are the **My Agent** for the SAGA document archive.
 (System prompt continues here …)
 ```
-
-> **Important:** The YAML key `on` is a reserved word in some YAML parsers.
-> Always quote it: `"on": [document.ingested]`.
 
 ---
 

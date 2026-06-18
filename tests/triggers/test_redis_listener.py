@@ -46,9 +46,7 @@ def _make_listener(
     defn = AgentDefinition(
         id=agent_id,
         enabled=True,
-        triggers=[
-            EventTrigger(type="event", on=on, debounce_minutes=debounce_minutes)
-        ],
+        triggers=[EventTrigger(type="event", topics=on, debounce_minutes=debounce_minutes)],
     )
     executor = StubExecutor()
     # redis is only used in run()/stop(); pass a minimal stub so __init__ works.

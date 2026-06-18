@@ -8,7 +8,7 @@ tools:
   write: [merge_events, delete_event, update_event]
 triggers:
   - type: event
-    "on": [document.ingested]
+    topics: [document.ingested]
     debounce_minutes: 15
   - type: schedule
     cron: "0 3 * * *"
