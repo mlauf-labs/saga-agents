@@ -1,0 +1,26 @@
+# saga-agents global configuration
+# All values support ${ENV_VAR:-default} substitution.
+# Copy .env.example to .env and fill in the secrets before running.
+
+mcp:
+  base_url: ${SAGA_MCP_URL:-http://localhost:8100}
+  bearer_token: ${SAGA_MCP_TOKEN:-changeme}
+
+ollama:
+  base_url: ${OLLAMA_URL:-http://localhost:11434}
+  default_model: ${AGENTS_DEFAULT_MODEL:-llama3.1:8b}
+
+redis:
+  url: ${REDIS_URL:-redis://localhost:6379/0}
+  event_channel: ${SAGA_EVENT_CHANNEL:-saga.events}
+
+langfuse:
+  public_key: ${LANGFUSE_PUBLIC_KEY:-}
+  secret_key: ${LANGFUSE_SECRET_KEY:-}
+  host: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+
+runtime:
+  max_concurrent_runs_global: 2
+  proposals_db: proposals.db
+
+agents_dir: config/agents

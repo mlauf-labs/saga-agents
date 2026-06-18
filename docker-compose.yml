@@ -1,0 +1,38 @@
+# saga-agents standalone compose
+#
+# Expects an external Saga stack (saga-core + Redis) to be running.
+# Point the env vars at the appropriate endpoints.
+#
+# Usage:
+#   cp .env.example .env       # fill in secrets
+#   docker compose up -d --build
+
+services:
+  saga-agents:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: saga-agents:latest
+    container_name: saga-agents
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${AGENTS_PORT:-8099}:8099"
+    environment:
+      SAGA_MCP_URL: ${SAGA_MCP_URL:-http://mcp:8100}
+      SAGA_MCP_TOKEN: ${SAGA_MCP_TOKEN}
+      OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
+      AGENTS_DEFAULT_MODEL: ${AGENTS_DEFAULT_MODEL:-llama3.1:8b}
+      REDIS_URL: ${REDIS_URL:-redis://localhost:6379/0}
+      SAGA_EVENT_CHANNEL: ${SAGA_EVENT_CHANNEL:-saga.events}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      AGENTS_EXTERNAL_TOKEN: ${AGENTS_EXTERNAL_TOKEN}
+      AGENTS_PORT: ${AGENTS_PORT:-8099}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8099/healthz')\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
