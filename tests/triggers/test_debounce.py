@@ -41,7 +41,7 @@ def test_burst_resets_quiet_window() -> None:
     now[0] = 19 * 60
     assert d.due() is False  # only 14 min since last mark — still quiet-pending
     now[0] = 21 * 60
-    assert d.due() is True   # 16 min since last mark — quiet window elapsed
+    assert d.due() is True  # 16 min since last mark — quiet window elapsed
     d.reset()
     assert d.due() is False  # consumed; no new signal since reset
 

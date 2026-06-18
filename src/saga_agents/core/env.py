@@ -40,9 +40,7 @@ def resolve_env(value: str) -> str:
             return env_val
         if default is not None:
             return default
-        raise ConfigError(
-            f"Environment variable {name!r} is not set and has no default value."
-        )
+        raise ConfigError(f"Environment variable {name!r} is not set and has no default value.")
 
     return _ENV_PATTERN.sub(_replace, value)
 

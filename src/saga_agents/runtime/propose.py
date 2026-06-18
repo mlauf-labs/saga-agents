@@ -26,7 +26,9 @@ def _propose(
     Returns:
         A confirmation string for the model.
     """
-    ctx.deps.proposals.append(ProposedAction(action=action, arguments=arguments, rationale=rationale))
+    ctx.deps.proposals.append(
+        ProposedAction(action=action, arguments=arguments, rationale=rationale)
+    )
     return f"Proposal recorded: {action}"
 
 

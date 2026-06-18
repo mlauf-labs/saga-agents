@@ -44,9 +44,7 @@ def configure_tracing(cfg: LangfuseSettings) -> bool:
         return True
 
     try:
-        credentials = base64.b64encode(
-            f"{cfg.public_key}:{cfg.secret_key}".encode()
-        ).decode()
+        credentials = base64.b64encode(f"{cfg.public_key}:{cfg.secret_key}".encode()).decode()
         endpoint = f"{cfg.host.rstrip('/')}/api/public/otel"
         headers = f"Authorization=Basic {credentials}"
 

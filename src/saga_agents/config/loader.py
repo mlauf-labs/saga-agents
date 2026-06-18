@@ -91,9 +91,7 @@ def parse_agent_markdown(text: str, *, source: str) -> AgentDefinition:
             frontmatter, or schema validation failure.
     """
     if not text.startswith("---\n"):
-        raise ConfigError(
-            f"Agent file {source!r} must start with a YAML frontmatter block (---)."
-        )
+        raise ConfigError(f"Agent file {source!r} must start with a YAML frontmatter block (---).")
     end = text.find("\n---\n", 4)
     if end == -1:
         raise ConfigError(
@@ -105,9 +103,7 @@ def parse_agent_markdown(text: str, *, source: str) -> AgentDefinition:
         raise ConfigError(f"Agent file {source!r} has an empty system-prompt body.")
     data: Any = yaml.safe_load(resolve_env_in_yaml(front_raw)) or {}
     if not isinstance(data, dict):
-        raise ConfigError(
-            f"Agent file {source!r} frontmatter must be a YAML mapping."
-        )
+        raise ConfigError(f"Agent file {source!r} frontmatter must be a YAML mapping.")
     data["system_prompt"] = body
     try:
         return AgentDefinition.model_validate(data)

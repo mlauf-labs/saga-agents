@@ -32,9 +32,7 @@ def test_tracing_returns_false_and_no_env_leak_when_logfire_raises(
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_HEADERS", raising=False)
 
-    result = configure_tracing(
-        LangfuseSettings(public_key="pk-test", secret_key="sk-test")
-    )
+    result = configure_tracing(LangfuseSettings(public_key="pk-test", secret_key="sk-test"))
 
     assert result is False
     assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in os.environ

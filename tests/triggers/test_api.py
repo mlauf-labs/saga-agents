@@ -237,9 +237,7 @@ async def test_approve_missing_proposal_returns_404(tmp_path: Path) -> None:
     client = TestClient(
         build_api(_stub(), {}, expected_token="t", proposal_store=store, mcp_call=fake_mcp)
     )
-    response = client.post(
-        "/proposals/nonexistent/approve", headers={"Authorization": "Bearer t"}
-    )
+    response = client.post("/proposals/nonexistent/approve", headers={"Authorization": "Bearer t"})
     assert response.status_code == 404
 
 
@@ -252,9 +250,7 @@ async def test_approve_mcp_failure_sets_failed_status(tmp_path: Path) -> None:
         raise RuntimeError("service down")
 
     client = TestClient(
-        build_api(
-            _stub(), {}, expected_token="t", proposal_store=store, mcp_call=failing_mcp
-        )
+        build_api(_stub(), {}, expected_token="t", proposal_store=store, mcp_call=failing_mcp)
     )
     response = client.post(
         f"/proposals/{proposal_id}/approve", headers={"Authorization": "Bearer t"}
@@ -290,9 +286,7 @@ async def test_reject_missing_proposal_returns_404(tmp_path: Path) -> None:
     store = await _make_store(tmp_path)
 
     client = TestClient(build_api(_stub(), {}, expected_token="t", proposal_store=store))
-    response = client.post(
-        "/proposals/nonexistent/reject", headers={"Authorization": "Bearer t"}
-    )
+    response = client.post("/proposals/nonexistent/reject", headers={"Authorization": "Bearer t"})
     assert response.status_code == 404
 
 
