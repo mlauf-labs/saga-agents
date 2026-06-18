@@ -47,13 +47,14 @@ def configure_tracing(cfg: LangfuseSettings) -> bool:
         credentials = base64.b64encode(
             f"{cfg.public_key}:{cfg.secret_key}".encode()
         ).decode()
-
-        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"{cfg.host.rstrip('/')}/api/public/otel"
-        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = f"Authorization=Basic {credentials}"
+        endpoint = f"{cfg.host.rstrip('/')}/api/public/otel"
+        headers = f"Authorization=Basic {credentials}"
 
         logfire.configure(send_to_logfire=False, service_name="saga-agents")
         logfire.instrument_pydantic_ai()
 
+        os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = endpoint
+        os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = headers
         _configured = True
         return True
 
