@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 
 from saga_agents.config.models import AgentDefinition
+from saga_agents.core.logging import get_logger
 from saga_agents.runtime.runner import AgentRunner
 from saga_agents.triggers.base import RunRequest
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class RunExecutor:
@@ -59,11 +59,11 @@ class RunExecutor:
         definition = self._definitions.get(req.agent_id)
         if definition is None or not definition.enabled:
             log.warning(
-                "submit_skipped_unknown_or_disabled agent_id=%s reason=%s known=%s enabled=%s",
-                req.agent_id,
-                req.reason,
-                definition is not None,
-                definition.enabled if definition is not None else False,
+                "submit_skipped_unknown_or_disabled",
+                agent_id=req.agent_id,
+                reason=req.reason,
+                known=definition is not None,
+                enabled=definition.enabled if definition is not None else False,
             )
             return
 
@@ -82,9 +82,9 @@ class RunExecutor:
                     )
                     if not acquired:
                         log.warning(
-                            "submit_skipped_redis_lock agent_id=%s reason=%s",
-                            agent_id,
-                            req.reason,
+                            "submit_skipped_redis_lock",
+                            agent_id=agent_id,
+                            reason=req.reason,
                         )
                         return
 
@@ -92,10 +92,10 @@ class RunExecutor:
                     report = await self._runner.run(definition)
                 except Exception as exc:  # noqa: BLE001
                     log.error(
-                        "run_unexpected_exception agent_id=%s reason=%s error=%s",
-                        agent_id,
-                        req.reason,
-                        exc,
+                        "run_unexpected_exception",
+                        agent_id=agent_id,
+                        reason=req.reason,
+                        error=str(exc),
                     )
                     return
                 finally:
@@ -103,11 +103,11 @@ class RunExecutor:
                         await self._redis.delete(lock_key)
 
                 log.info(
-                    "run_completed agent_id=%s reason=%s status=%s tool_calls=%d proposals=%d trace_id=%s",
-                    agent_id,
-                    req.reason,
-                    report.status,
-                    report.tool_calls,
-                    len(report.proposals),
-                    report.trace_id,
+                    "run_completed",
+                    agent_id=agent_id,
+                    reason=req.reason,
+                    status=report.status,
+                    tool_calls=report.tool_calls,
+                    proposals=len(report.proposals),
+                    trace_id=report.trace_id,
                 )

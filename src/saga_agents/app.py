@@ -12,7 +12,6 @@ Exports:
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -22,6 +21,7 @@ from fastapi import FastAPI
 
 from saga_agents.config.loader import load_agent_files, load_global_config
 from saga_agents.config.models import AgentDefinition, GlobalConfig, ScheduleTrigger
+from saga_agents.core.logging import get_logger
 from saga_agents.proposals.store import SqliteProposalStore
 from saga_agents.runtime.mcp_call import build_mcp_call
 from saga_agents.runtime.runner import AgentRunner
@@ -31,7 +31,7 @@ from saga_agents.triggers.executor import RunExecutor
 from saga_agents.triggers.redis_listener import RedisListener
 from saga_agents.triggers.scheduler import CronScheduler
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +124,11 @@ def build_service(
 
     # Read the external API token from the environment.
     external_token = os.environ.get("AGENTS_EXTERNAL_TOKEN", "changeme")
+    if not external_token or external_token == "changeme":
+        log.warning(
+            "external_trigger_token_insecure",
+            hint="Set AGENTS_EXTERNAL_TOKEN to a strong secret before exposing this service.",
+        )
 
     # Build FastAPI app.
     api = build_api(
@@ -169,6 +174,12 @@ async def run_service(config_path: str) -> None:
     import redis.asyncio as aioredis  # local import to keep module top-level clean
 
     redis_client = aioredis.from_url(config.redis.url)
+
+    # Verify Redis is reachable at startup (non-fatal — schedule/external triggers still work).
+    try:
+        await redis_client.ping()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("redis_ping_failed", error=str(exc), hint="Event triggers will not fire.")
 
     # Initialise proposal store.
     proposal_store = SqliteProposalStore(config.runtime.proposals_db)
@@ -222,7 +233,7 @@ async def run_service(config_path: str) -> None:
         try:
             await redis_client.aclose()
         except Exception as exc:  # noqa: BLE001
-            log.warning("redis_close_error error=%s", exc)
+            log.warning("redis_close_error", error=str(exc))
 
 
 # ---------------------------------------------------------------------------

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import logging
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
 
+from saga_agents.core.logging import get_logger
 from saga_agents.triggers.base import RunRequest
 from saga_agents.triggers.executor import RunExecutor
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 class CronScheduler:
@@ -34,7 +33,7 @@ class CronScheduler:
         """
 
         async def _fire(aid: str = agent_id) -> None:
-            log.info("cron_trigger_fired agent_id=%s", aid)
+            log.info("cron_trigger_fired", agent_id=aid)
             await self._executor.submit(RunRequest(aid, reason="schedule"))
 
         self._scheduler.add_job(
@@ -43,7 +42,7 @@ class CronScheduler:
             id=f"cron:{agent_id}",
             replace_existing=True,
         )
-        log.info("cron_job_registered agent_id=%s cron=%s", agent_id, cron)
+        log.info("cron_job_registered", agent_id=agent_id, cron=cron)
 
     def start(self) -> None:
         """Start the underlying APScheduler scheduler."""

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import uuid
 from typing import Any, Callable, Protocol
 
@@ -13,18 +12,13 @@ from pydantic_ai.messages import ToolCallPart
 from pydantic_ai.usage import UsageLimits
 
 from saga_agents.config.models import AgentDefinition, GlobalConfig
+from saga_agents.core.logging import get_logger
 from saga_agents.runtime.model import build_model
 from saga_agents.runtime.propose import build_propose_tool
 from saga_agents.runtime.report import RunDeps, RunReport, RunStatus
 from saga_agents.runtime.toolset import build_mcp_server, filtered_server, visible_tool_names
 
-
-def get_logger(name: str) -> logging.Logger:
-    """Return a stdlib logger for *name*."""
-    return logging.getLogger(name)
-
-
-log = get_logger("saga_agents.runtime.runner")
+log = get_logger(__name__)
 logger = log  # keep module-level ``logger`` alias for existing callers
 
 
@@ -60,7 +54,7 @@ def _count_tool_calls(result: Any) -> int:
                     if name != "propose":
                         count += 1
     except Exception as exc:  # noqa: BLE001
-        log.warning("count_tool_calls_failed error=%s", exc)
+        log.warning("count_tool_calls_failed", error=str(exc))
     return count
 
 
@@ -178,9 +172,9 @@ class AgentRunner:
                 except Exception as sink_exc:  # noqa: BLE001
                     persistence_error = str(sink_exc)
                     logger.warning(
-                        "ProposalSink.add failed for run %s: %s",
-                        run_id,
-                        sink_exc,
+                        "proposal_sink_add_failed",
+                        run_id=run_id,
+                        error=str(sink_exc),
                     )
 
         # Surface persistence degradation in the summary so callers see it

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import time
 from typing import Any, Callable
 
 from saga_agents.config.models import AgentDefinition, EventTrigger
+from saga_agents.core.logging import get_logger
 from saga_agents.triggers.base import RunRequest
 from saga_agents.triggers.executor import RunExecutor
 
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 # How often the tick loop checks debouncers (seconds).
 _TICK_INTERVAL: float = 5.0
@@ -81,16 +81,16 @@ class Debouncer:
 class _AgentTriggerState:
     """Associates an agent's EventTrigger with its Debouncer."""
 
-    __slots__ = ("agent_id", "debouncer", "last_topic", "on")
+    __slots__ = ("agent_id", "debouncer", "last_topic", "topics")
 
     def __init__(
         self,
         agent_id: str,
-        on: frozenset[str],
+        topics: frozenset[str],
         debouncer: Debouncer,
     ) -> None:
         self.agent_id = agent_id
-        self.on = on
+        self.topics = topics
         self.debouncer = debouncer
         self.last_topic: str = "debounced"
 
@@ -138,7 +138,7 @@ class RedisListener:
                     delay = max(trigger.debounce_minutes * 60.0, 1.0)
                     state = _AgentTriggerState(
                         agent_id=agent_id,
-                        on=frozenset(trigger.on),
+                        topics=frozenset(trigger.topics),
                         debouncer=Debouncer(delay),
                     )
                     self._states.append(state)
@@ -155,7 +155,7 @@ class RedisListener:
         """
         self._pubsub = self._redis.pubsub()
         await self._pubsub.subscribe(self._channel)
-        log.info("redis_listener_subscribed channel=%s", self._channel)
+        log.info("redis_listener_subscribed", channel=self._channel)
 
         self._listener_task = asyncio.create_task(self._listener_loop())
         self._tick_task = asyncio.create_task(self._tick_loop())
@@ -175,8 +175,8 @@ class RedisListener:
                 await self._pubsub.unsubscribe(self._channel)
                 await self._pubsub.aclose()
             except Exception as exc:  # noqa: BLE001
-                log.warning("redis_listener_unsubscribe_error error=%s", exc)
-        log.info("redis_listener_stopped channel=%s", self._channel)
+                log.warning("redis_listener_unsubscribe_error", error=str(exc))
+        log.info("redis_listener_stopped", channel=self._channel)
 
     # ------------------------------------------------------------------
     # Internal loops
@@ -196,18 +196,18 @@ class RedisListener:
                 topic: str = msg.get("topic", "")
                 self._handle_message(topic, msg)
             except Exception as exc:  # noqa: BLE001
-                log.warning("redis_listener_message_error error=%s", exc)
+                log.warning("redis_listener_message_error", error=str(exc))
 
     def _handle_message(self, topic: str, msg: dict[str, Any]) -> None:
         """Mark debouncers for all agents that listen to *topic*."""
         for state in self._states:
-            if topic in state.on:
+            if topic in state.topics:
                 state.last_topic = topic
                 state.debouncer.mark()
                 log.debug(
-                    "debouncer_marked agent_id=%s topic=%s",
-                    state.agent_id,
-                    topic,
+                    "debouncer_marked",
+                    agent_id=state.agent_id,
+                    topic=topic,
                 )
 
     async def _tick_loop(self) -> None:
@@ -230,16 +230,16 @@ class RedisListener:
                     reason=f"event:{state.last_topic}",
                 )
                 log.debug(
-                    "debouncer_fired agent_id=%s reason=%s",
-                    state.agent_id,
-                    req.reason,
+                    "debouncer_fired",
+                    agent_id=state.agent_id,
+                    reason=req.reason,
                 )
                 try:
                     await self._executor.submit(req)
                 except Exception as exc:  # noqa: BLE001
                     log.error(
-                        "tick_loop_submit_error agent_id=%s reason=%s error=%s",
-                        state.agent_id,
-                        req.reason,
-                        exc,
+                        "tick_loop_submit_error",
+                        agent_id=state.agent_id,
+                        reason=req.reason,
+                        error=str(exc),
                     )
