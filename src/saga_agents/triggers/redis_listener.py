@@ -21,14 +21,15 @@ _TICK_INTERVAL: float = 5.0
 class Debouncer:
     """Single-agent debounce gate.
 
-    Call :meth:`mark` whenever a relevant event arrives.  The quiet-window
-    clock starts on the *first* mark after a reset; subsequent marks in the
-    same burst do **not** restart the clock (the window keeps ticking from the
-    first signal, collapsing a burst into one run).
+    Call :meth:`mark` whenever a relevant event arrives.  Every mark resets
+    the quiet-window clock to ``now``, so the agent fires only after
+    *delay_seconds* of silence — i.e. no new signal has arrived for that
+    long.  This matches spec §6.2: fire when ``now - last_signal >=
+    debounce_minutes``.
 
-    :meth:`due` returns ``True`` once *delay_seconds* have elapsed since that
-    first mark and at least one mark has been received since the last
-    :meth:`reset`.
+    :meth:`due` returns ``True`` once *delay_seconds* have elapsed since the
+    **most recent** :meth:`mark` and at least one mark has been received since
+    the last :meth:`reset`.
 
     Args:
         delay_seconds: Quiet-window length in seconds.
@@ -50,20 +51,18 @@ class Debouncer:
     def mark(self) -> None:
         """Record that a triggering event was observed.
 
-        Only the first mark after a reset starts the quiet-window clock.
-        Subsequent marks within the same pending window are ignored so that a
-        burst of events is collapsed into a single run.
+        Every call resets the quiet-window clock to the current time, pushing
+        the earliest possible fire time out by *delay_seconds* from now.
         """
-        if not self._pending:
-            self._last_mark = self._clock()
-            self._pending = True
+        self._last_mark = self._clock()
+        self._pending = True
 
     def due(self) -> bool:
-        """Return ``True`` iff the quiet window has elapsed since the first mark.
+        """Return ``True`` iff the quiet window has elapsed since the last mark.
 
         Returns:
             ``True`` when a mark is pending and at least *delay_seconds* have
-            passed since the first :meth:`mark` since the last reset.
+            passed since the most recent :meth:`mark`.
         """
         if not self._pending or self._last_mark is None:
             return False

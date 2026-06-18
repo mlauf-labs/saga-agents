@@ -23,17 +23,27 @@ def test_due_after_quiet_window() -> None:
     assert d.due() is True
 
 
-def test_burst_collapses_and_resets() -> None:
-    """A second mark within the window resets the clock; reset() clears pending."""
+def test_burst_resets_quiet_window() -> None:
+    """Each new signal resets the quiet-window clock (spec §6.2).
+
+    Timeline (delay = 15 min):
+      t= 0 min  first mark
+      t= 5 min  second mark  → clock resets to t=5
+      t=19 min  only 14 min since last mark → NOT due
+      t=21 min  16 min since last mark → due
+      reset()   consumed; no new signal → not due
+    """
     now = [0.0]
     d = Debouncer(15 * 60, clock=lambda: now[0])
     d.mark()
     now[0] = 5 * 60
-    d.mark()  # second signal resets the quiet window
+    d.mark()  # second signal RESETS the window to t=5 min
     now[0] = 19 * 60
-    assert d.due() is True
+    assert d.due() is False  # only 14 min since last mark — still quiet-pending
+    now[0] = 21 * 60
+    assert d.due() is True   # 16 min since last mark — quiet window elapsed
     d.reset()
-    assert d.due() is False  # no new signal since reset
+    assert d.due() is False  # consumed; no new signal since reset
 
 
 def test_not_due_without_mark() -> None:
