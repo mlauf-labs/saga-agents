@@ -19,7 +19,7 @@ services:
     ports:
       - "${AGENTS_PORT:-8099}:8099"
     environment:
-      SAGA_MCP_URL: ${SAGA_MCP_URL:-http://mcp:8100}
+      SAGA_MCP_URL: ${SAGA_MCP_URL:-http://mcp:8100/mcp}
       SAGA_MCP_TOKEN: ${SAGA_MCP_TOKEN}
       OLLAMA_URL: ${OLLAMA_URL:-http://localhost:11434}
       AGENTS_DEFAULT_MODEL: ${AGENTS_DEFAULT_MODEL:-llama3.1:8b}

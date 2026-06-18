@@ -111,7 +111,7 @@ docker compose up -d --build
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `SAGA_MCP_URL` | Yes | `http://localhost:8100` | SAGA MCP server endpoint |
+| `SAGA_MCP_URL` | Yes | `http://localhost:8100/mcp` | SAGA MCP server endpoint |
 | `SAGA_MCP_TOKEN` | Yes | — | Bearer token for MCP server |
 | `OLLAMA_URL` | Yes | `http://localhost:11434` | Ollama API endpoint |
 | `AGENTS_DEFAULT_MODEL` | No | `llama3.1:8b` | Default LLM model |
