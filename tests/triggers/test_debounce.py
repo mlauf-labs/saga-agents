@@ -1,0 +1,81 @@
+"""Tests for Debouncer timing logic."""
+
+from __future__ import annotations
+
+from saga_agents.triggers.redis_listener import Debouncer
+
+
+def test_not_due_before_delay() -> None:
+    """Debouncer is not due before the quiet window elapses."""
+    now = [0.0]
+    d = Debouncer(15 * 60, clock=lambda: now[0])
+    d.mark()
+    now[0] = 10 * 60
+    assert d.due() is False
+
+
+def test_due_after_quiet_window() -> None:
+    """Debouncer becomes due once the quiet window has elapsed."""
+    now = [0.0]
+    d = Debouncer(15 * 60, clock=lambda: now[0])
+    d.mark()
+    now[0] = 16 * 60
+    assert d.due() is True
+
+
+def test_burst_collapses_and_resets() -> None:
+    """A second mark within the window resets the clock; reset() clears pending."""
+    now = [0.0]
+    d = Debouncer(15 * 60, clock=lambda: now[0])
+    d.mark()
+    now[0] = 5 * 60
+    d.mark()  # second signal resets the quiet window
+    now[0] = 19 * 60
+    assert d.due() is True
+    d.reset()
+    assert d.due() is False  # no new signal since reset
+
+
+def test_not_due_without_mark() -> None:
+    """A fresh debouncer with no marks is never due."""
+    now = [0.0]
+    d = Debouncer(1.0, clock=lambda: now[0])
+    now[0] = 999.0
+    assert d.due() is False
+
+
+def test_re_armed_after_reset_and_new_mark() -> None:
+    """After reset(), a new mark re-arms the debouncer."""
+    now = [0.0]
+    d = Debouncer(10.0, clock=lambda: now[0])
+    d.mark()
+    now[0] = 15.0
+    assert d.due() is True
+    d.reset()
+    assert d.due() is False
+    # Re-arm
+    now[0] = 20.0
+    d.mark()
+    now[0] = 31.0
+    assert d.due() is True
+
+
+def test_exactly_at_boundary_not_due() -> None:
+    """At exactly *delay_seconds* elapsed the debouncer is not yet due (strictly less-than)."""
+    now = [0.0]
+    d = Debouncer(10.0, clock=lambda: now[0])
+    d.mark()
+    now[0] = 10.0
+    # clock() - last_mark == 10.0 which is >= 10.0 so it IS due
+    assert d.due() is True
+
+
+def test_due_exact_boundary() -> None:
+    """At exactly delay_seconds the debouncer is due (>= semantics)."""
+    now = [0.0]
+    d = Debouncer(10.0, clock=lambda: now[0])
+    d.mark()
+    now[0] = 9.999
+    assert d.due() is False
+    now[0] = 10.0
+    assert d.due() is True
