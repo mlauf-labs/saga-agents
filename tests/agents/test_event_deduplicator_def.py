@@ -9,7 +9,8 @@ def test_event_deduplicator_loads() -> None:
     d = defs["event-deduplicator"]
     assert d.autonomy == "proposal"
     assert "merge_events" in d.tools.write
-    assert d.system_prompt.startswith("You are the **Event Deduplicator**")
+    assert d.system_prompt.startswith("{{saga.store_description}}")
+    assert "Event Deduplicator" in d.system_prompt
 
 
 def test_event_deduplicator_tools_write_subset_of_allow() -> None:

@@ -11,6 +11,8 @@ def test_re_categorizer_loads() -> None:
     assert "assign_document_to_folder" in d.tools.write
     assert "set_primary_folder" in d.tools.write
     assert "set_document_folders" in d.tools.write
+    assert d.system_prompt.startswith("{{saga.store_description}}")
+    assert "{{saga.folder_instructions}}" in d.system_prompt
     assert d.system_prompt.strip() != ""
 
 

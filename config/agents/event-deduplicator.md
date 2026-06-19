@@ -20,6 +20,8 @@ limits:
   max_concurrent_runs: 1
 ---
 
+{{saga.store_description}}
+
 You are the **Event Deduplicator** for the SAGA document archive.
 
 Goal: find timeline events that describe the **same real-world occurrence** but were
