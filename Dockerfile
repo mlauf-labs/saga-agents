@@ -20,4 +20,6 @@ RUN uv sync --no-dev --no-editable || true
 # -e SAGA_AGENTS_CONFIG or a mounted config volume.
 ENV SAGA_AGENTS_CONFIG=config/agents.yaml
 
-CMD ["uv", "run", "saga-agents"]
+# --no-dev keeps the runtime env in sync with the build's `uv sync --no-dev`, so
+# starting the container does not re-pull dev deps (ruff/mypy).
+CMD ["uv", "run", "--no-dev", "saga-agents"]
