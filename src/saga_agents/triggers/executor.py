@@ -8,6 +8,7 @@ from typing import Any
 
 from saga_agents.config.models import AgentDefinition
 from saga_agents.core.logging import get_logger
+from saga_agents.runtime.report import RunStatus
 from saga_agents.runtime.runner import AgentRunner
 from saga_agents.triggers.base import RunRequest
 
@@ -116,7 +117,10 @@ class RunExecutor:
                         except Exception:  # noqa: BLE001
                             pass  # best-effort release
 
-                log.info(
+                # Surface the failure reason: a non-OK run logs at warning level WITH the
+                # error, so debugging never requires reproducing the run.
+                log_fn = log.info if report.status == RunStatus.OK else log.warning
+                log_fn(
                     "run_completed",
                     agent_id=agent_id,
                     reason=req.reason,
@@ -124,4 +128,5 @@ class RunExecutor:
                     tool_calls=report.tool_calls,
                     proposals=len(report.proposals),
                     trace_id=report.trace_id,
+                    error=report.error,
                 )

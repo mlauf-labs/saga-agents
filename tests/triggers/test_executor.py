@@ -373,3 +373,49 @@ async def test_redis_advisory_lock_does_not_delete_foreign_lock() -> None:
     assert fake_redis.eval_calls == 1
     # the foreign token must NOT have been deleted
     assert fake_redis._store.get("agent:lock:ownership-agent") == "foreign-token"
+
+
+@pytest.mark.asyncio
+async def test_error_run_logs_reason_at_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-OK run is logged at warning level WITH report.error (no reproduction needed)."""
+
+    class ErrorRunner:
+        async def run(self, definition: AgentDefinition, *, prompt: str | None = None) -> RunReport:
+            return RunReport(
+                run_id="r",
+                agent_id=definition.id,
+                status=RunStatus.ERROR,
+                summary="",
+                tool_calls=0,
+                proposals=[],
+                error="boom-detail",
+                trace_id=None,
+            )
+
+    records: list[tuple[str, str, dict[str, Any]]] = []
+
+    class FakeLog:
+        def info(self, event: str, **kw: Any) -> None:
+            records.append(("info", event, kw))
+
+        def warning(self, event: str, **kw: Any) -> None:
+            records.append(("warning", event, kw))
+
+        def error(self, event: str, **kw: Any) -> None:
+            records.append(("error", event, kw))
+
+    monkeypatch.setattr("saga_agents.triggers.executor.log", FakeLog())
+    executor = RunExecutor(
+        ErrorRunner(),  # type: ignore[arg-type]
+        {"err-agent": _make_definition("err-agent")},
+        global_limit=2,
+    )
+
+    await executor.submit(RunRequest(agent_id="err-agent", reason="test"))
+
+    completed = [r for r in records if r[1] == "run_completed"]
+    assert len(completed) == 1
+    level, _event, kw = completed[0]
+    assert level == "warning"
+    assert kw["error"] == "boom-detail"
+    assert kw["status"] == RunStatus.ERROR
