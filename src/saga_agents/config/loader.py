@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from saga_agents.config.models import AgentDefinition, GlobalConfig
 from saga_agents.core.env import resolve_env, resolve_tree
 from saga_agents.core.errors import ConfigError
+from saga_agents.runtime.guidance import validate_placeholders
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +105,7 @@ def parse_agent_markdown(text: str, *, source: str) -> AgentDefinition:
     data: Any = yaml.safe_load(resolve_env_in_yaml(front_raw)) or {}
     if not isinstance(data, dict):
         raise ConfigError(f"Agent file {source!r} frontmatter must be a YAML mapping.")
+    validate_placeholders(body, source=source)
     data["system_prompt"] = body
     try:
         return AgentDefinition.model_validate(data)

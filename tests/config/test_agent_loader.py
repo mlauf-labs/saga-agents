@@ -98,3 +98,20 @@ def test_load_agent_files_duplicate_id_raises(tmp_path: Path) -> None:
 def test_load_agent_files_empty_dir(tmp_path: Path) -> None:
     agents = load_agent_files(str(tmp_path))
     assert agents == []
+
+
+# ---------------------------------------------------------------------------
+# Placeholder validation tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_rejects_unknown_saga_placeholder() -> None:
+    text = "---\nid: x\ntools:\n  allow: []\n---\nBody with {{saga.bogus_key}}.\n"
+    with pytest.raises(ConfigError):
+        parse_agent_markdown(text, source="x.md")
+
+
+def test_parse_accepts_known_saga_placeholder() -> None:
+    text = "---\nid: x\ntools:\n  allow: []\n---\nArchive: {{saga.store_description}}.\n"
+    d = parse_agent_markdown(text, source="x.md")
+    assert "{{saga.store_description}}" in d.system_prompt
