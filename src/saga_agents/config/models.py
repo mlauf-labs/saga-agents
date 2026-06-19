@@ -137,6 +137,7 @@ class RuntimeSettings(BaseModel):
 
     max_concurrent_runs_global: int = 2
     proposals_db: str = "proposals.db"
+    guidance_cache_ttl_seconds: float = 300.0
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,8 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.toolsets import FunctionToolset
 from pydantic_ai.toolsets.filtered import FilteredToolset
 
-from saga_agents.config.models import AgentDefinition, GlobalConfig
+from saga_agents.config.models import AgentDefinition, GlobalConfig, ToolsSpec
+from saga_agents.core.errors import GuidanceFetchError
 from saga_agents.runtime.report import RunStatus
 from saga_agents.runtime.runner import AgentRunner
 
@@ -152,6 +153,36 @@ async def test_runner_proposal_mode_persists(
     assert sink.calls[0]["action"] == "delete_doc"
 
 
+# ---------------------------------------------------------------------------
+# Guidance provider helpers
+# ---------------------------------------------------------------------------
+
+
+class _FakeGuidance:
+    def __init__(self, result: Any) -> None:
+        self._result = result
+        self.calls = 0
+
+    async def get(self) -> dict[str, str]:
+        self.calls += 1
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result  # type: ignore[no-any-return]
+
+
+def _definition_with_prompt(text: str) -> AgentDefinition:
+    """Build an AgentDefinition with the given system_prompt."""
+    return AgentDefinition(
+        id="placeholder-agent",
+        enabled=True,
+        description="Test agent",
+        model=None,
+        autonomy="autonomous",
+        tools=ToolsSpec(allow=[], write=[]),
+        system_prompt=text,
+    )
+
+
 class FailingSink:
     """ProposalSink whose add() always raises, to test degradation surfacing."""
 
@@ -204,3 +235,65 @@ async def test_runner_proposal_sink_failure_surfaces_in_summary(
     assert report.error is None
     # Degradation note must appear in summary
     assert "persistence degraded" in report.summary
+
+
+# ---------------------------------------------------------------------------
+# Guidance / placeholder tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resolve_system_prompt_substitutes(global_config: GlobalConfig) -> None:
+    """_resolve_system_prompt replaces {{saga.store_description}} from the fake provider."""
+    g = _FakeGuidance(
+        {
+            "store_description": "FamArchive",
+            "folder_instructions": "",
+            "doctype_instructions": "",
+            "metadata_instructions": "",
+            "summary_instructions": "",
+            "language": "English",
+        }
+    )
+    runner = AgentRunner(
+        global_config,
+        guidance_provider=g,
+        mcp_server_factory=lambda *a, **k: _EmptyToolset(),
+        model_factory=lambda *a, **k: TestModel(),
+    )
+    definition = _definition_with_prompt("Archive: {{saga.store_description}}.")
+    out = await runner._resolve_system_prompt(definition)
+    assert out == "Archive: FamArchive."
+    assert g.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_resolve_system_prompt_skips_fetch_when_no_placeholders(
+    global_config: GlobalConfig,
+) -> None:
+    """_resolve_system_prompt does NOT call the provider when there are no placeholders."""
+    g = _FakeGuidance({})
+    runner = AgentRunner(
+        global_config,
+        guidance_provider=g,
+        mcp_server_factory=lambda *a, **k: _EmptyToolset(),
+        model_factory=lambda *a, **k: TestModel(),
+    )
+    out = await runner._resolve_system_prompt(_definition_with_prompt("no tokens"))
+    assert out == "no tokens"
+    assert g.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_run_errors_when_guidance_fetch_fails(global_config: GlobalConfig) -> None:
+    """run() with a failing guidance provider returns an ERROR report — never raises."""
+    g = _FakeGuidance(GuidanceFetchError("saga mcp down"))
+    runner = AgentRunner(
+        global_config,
+        guidance_provider=g,
+        mcp_server_factory=lambda *a, **k: _EmptyToolset(),
+        model_factory=lambda *a, **k: TestModel(),
+    )
+    report = await runner.run(_definition_with_prompt("Need {{saga.store_description}}"))
+    assert report.status == RunStatus.ERROR
+    assert "saga" in (report.error or "").lower()
