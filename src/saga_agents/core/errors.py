@@ -14,3 +14,7 @@ class ConfigError(AgentsError):
 
 class RunError(AgentsError):
     """A run could not be completed."""
+
+
+class GuidanceFetchError(AgentsError):
+    """The saga-core guidance ({{saga.*}}) could not be fetched for prompt substitution."""
