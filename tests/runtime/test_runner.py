@@ -287,7 +287,11 @@ async def test_resolve_system_prompt_skips_fetch_when_no_placeholders(
 @pytest.mark.asyncio
 async def test_run_errors_when_guidance_fetch_fails(global_config: GlobalConfig) -> None:
     """run() with a failing guidance provider returns an ERROR report — never raises."""
-    g = _FakeGuidance(GuidanceFetchError("saga mcp down"))
+    # Use the real production error message GuidanceProvider emits, so the assertion
+    # verifies that str(exc) actually propagates into report.error (not a tautology).
+    g = _FakeGuidance(
+        GuidanceFetchError("Could not fetch get_store_guidance from MCP: connection refused")
+    )
     runner = AgentRunner(
         global_config,
         guidance_provider=g,
@@ -296,4 +300,4 @@ async def test_run_errors_when_guidance_fetch_fails(global_config: GlobalConfig)
     )
     report = await runner.run(_definition_with_prompt("Need {{saga.store_description}}"))
     assert report.status == RunStatus.ERROR
-    assert "saga" in (report.error or "").lower()
+    assert "get_store_guidance" in (report.error or "")
