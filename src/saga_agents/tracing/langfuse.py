@@ -48,14 +48,20 @@ def configure_tracing(cfg: LangfuseSettings) -> bool:
         endpoint = f"{cfg.host.rstrip('/')}/api/public/otel"
         headers = f"Authorization=Basic {credentials}"
 
-        logfire.configure(send_to_logfire=False, service_name="saga-agents")
-        logfire.instrument_pydantic_ai()
-
+        # These MUST be set BEFORE logfire.configure(): logfire reads the OTLP env vars
+        # at configure time to wire up the exporter that ships spans to Langfuse. Setting
+        # them afterwards leaves logfire with no exporter, so nothing is ever sent.
         os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = endpoint
         os.environ["OTEL_EXPORTER_OTLP_HEADERS"] = headers
+
+        logfire.configure(send_to_logfire=False, service_name="saga-agents")
+        logfire.instrument_pydantic_ai()
         _configured = True
         return True
 
     except Exception as exc:  # noqa: BLE001
+        # Never leave a half-applied OTLP config behind when configuration fails.
+        os.environ.pop("OTEL_EXPORTER_OTLP_ENDPOINT", None)
+        os.environ.pop("OTEL_EXPORTER_OTLP_HEADERS", None)
         _log.warning("tracing_configure_failed", error=str(exc))
         return False
