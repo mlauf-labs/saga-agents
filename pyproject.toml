@@ -13,6 +13,7 @@ dependencies = [
     "apscheduler>=3.10",
     "aiosqlite>=0.20",
     "logfire>=0.50",
+    "opentelemetry-api>=1.20",
     "structlog>=24.1",
 ]
 

@@ -6,6 +6,7 @@ import asyncio
 import uuid
 from typing import Any, Callable, Protocol
 
+from opentelemetry import trace as otel_trace
 from pydantic_ai import Agent
 from pydantic_ai.exceptions import UsageLimitExceeded
 from pydantic_ai.messages import ToolCallPart
@@ -22,6 +23,18 @@ from saga_agents.runtime.toolset import build_mcp_server, filtered_server, visib
 
 log = get_logger(__name__)
 logger = log  # keep module-level ``logger`` alias for existing callers
+
+_tracer = otel_trace.get_tracer(__name__)
+
+
+def current_trace_id() -> str | None:
+    """Return the active OpenTelemetry trace id as a 32-char hex string, or None.
+
+    Returns None when no valid recording span is active — i.e. when Langfuse/OTel
+    tracing is disabled (the no-op tracer yields an invalid span context).
+    """
+    ctx = otel_trace.get_current_span().get_span_context()
+    return format(ctx.trace_id, "032x") if ctx.is_valid else None
 
 
 class GuidanceLike(Protocol):
@@ -177,17 +190,24 @@ class AgentRunner:
         tool_calls: int
         error: str | None
 
+        trace_id: str | None = None
         try:
-            async with asyncio.timeout(limits.timeout_seconds):
-                async with agent:
-                    result = await agent.run(
-                        effective_prompt,
-                        deps=deps,
-                        usage_limits=UsageLimits(
-                            request_limit=limits.max_steps,
-                            tool_calls_limit=limits.max_tool_calls,
-                        ),
-                    )
+            # Wrap the run in a named span so Langfuse gets a clean root and we can
+            # capture the trace id to link the run report back to the trace.
+            with _tracer.start_as_current_span("saga_agent_run") as span:
+                span.set_attribute("saga.agent_id", definition.id)
+                span.set_attribute("saga.run_id", run_id)
+                trace_id = current_trace_id()
+                async with asyncio.timeout(limits.timeout_seconds):
+                    async with agent:
+                        result = await agent.run(
+                            effective_prompt,
+                            deps=deps,
+                            usage_limits=UsageLimits(
+                                request_limit=limits.max_steps,
+                                tool_calls_limit=limits.max_tool_calls,
+                            ),
+                        )
             status = RunStatus.OK
             summary = str(result.output)
             tool_calls = _count_tool_calls(result)
@@ -241,5 +261,5 @@ class AgentRunner:
             tool_calls=tool_calls,
             proposals=list(deps.proposals),
             error=error,
-            trace_id=None,
+            trace_id=trace_id,
         )

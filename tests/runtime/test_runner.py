@@ -301,3 +301,23 @@ async def test_run_errors_when_guidance_fetch_fails(global_config: GlobalConfig)
     report = await runner.run(_definition_with_prompt("Need {{saga.store_description}}"))
     assert report.status == RunStatus.ERROR
     assert "get_store_guidance" in (report.error or "")
+
+
+def test_current_trace_id_is_none_outside_a_span() -> None:
+    from saga_agents.runtime.runner import current_trace_id
+
+    # No active recording span (tracing effectively off) → no trace id.
+    assert current_trace_id() is None
+
+
+def test_current_trace_id_is_hex_inside_a_span() -> None:
+    from opentelemetry.sdk.trace import TracerProvider
+
+    from saga_agents.runtime.runner import current_trace_id
+
+    tracer = TracerProvider().get_tracer("test")
+    with tracer.start_as_current_span("x"):
+        tid = current_trace_id()
+    assert tid is not None
+    assert len(tid) == 32
+    assert all(c in "0123456789abcdef" for c in tid)
