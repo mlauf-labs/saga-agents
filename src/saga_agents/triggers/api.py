@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from saga_agents.config.models import AgentDefinition
+from saga_agents.metrics.registry import AGENT_REGISTRY
 from saga_agents.proposals.apply import apply_proposal
 from saga_agents.proposals.store import SqliteProposalStore
 from saga_agents.triggers.base import RunRequest
@@ -115,5 +117,25 @@ def build_api(
             raise HTTPException(status_code=404, detail=f"Proposal not found: {proposal_id}")
         await proposal_store.set_status(proposal_id, "rejected")
         return JSONResponse({"status": "rejected"})
+
+    @app.get("/metrics")
+    async def metrics() -> Response:
+        return Response(generate_latest(AGENT_REGISTRY), media_type=CONTENT_TYPE_LATEST)
+
+    @app.get("/stats")
+    async def stats(_: None = Depends(_verify_token)) -> JSONResponse:
+        agents = [{"id": aid, "enabled": d.enabled} for aid, d in definitions.items()]
+        proposals: dict[str, int] = {}
+        if proposal_store is not None:
+            for aid in definitions:
+                pending = await proposal_store.list_pending(aid)
+                proposals[aid] = len(pending)
+        return JSONResponse(
+            {
+                "agents": agents,
+                "proposals": proposals,
+                "runtime": {"agent_count": len(definitions)},
+            }
+        )
 
     return app

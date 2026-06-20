@@ -22,6 +22,7 @@ from fastapi import FastAPI
 from saga_agents.config.loader import load_agent_files, load_global_config
 from saga_agents.config.models import AgentDefinition, GlobalConfig, ScheduleTrigger
 from saga_agents.core.logging import get_logger
+from saga_agents.metrics.registry import AGENT_CONCURRENCY_LIMIT
 from saga_agents.proposals.store import SqliteProposalStore
 from saga_agents.runtime.mcp_call import build_mcp_call
 from saga_agents.runtime.runner import AgentRunner
@@ -104,6 +105,7 @@ def build_service(
         global_limit=config.runtime.max_concurrent_runs_global,
         redis=redis,
     )
+    AGENT_CONCURRENCY_LIMIT.set(config.runtime.max_concurrent_runs_global)
 
     # Register all schedule triggers.
     scheduler = CronScheduler(executor)
