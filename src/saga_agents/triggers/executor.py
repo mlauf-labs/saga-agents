@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from typing import Any
 
 from saga_agents.config.models import AgentDefinition
 from saga_agents.core.logging import get_logger
+from saga_agents.metrics.registry import AGENT_INFLIGHT, AGENT_RUN_DURATION, AGENT_RUNS
 from saga_agents.runtime.report import RunStatus
 from saga_agents.runtime.runner import AgentRunner
 from saga_agents.triggers.base import RunRequest
@@ -100,9 +102,12 @@ class RunExecutor:
                         )
                         return
 
+                AGENT_INFLIGHT.inc()
+                _start = time.perf_counter()
                 try:
                     report = await self._runner.run(definition)
                 except Exception as exc:  # noqa: BLE001
+                    AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result="error").inc()
                     log.error(
                         "run_unexpected_exception",
                         agent_id=agent_id,
@@ -111,11 +116,18 @@ class RunExecutor:
                     )
                     return
                 finally:
+                    AGENT_RUN_DURATION.labels(agent_id=agent_id).observe(
+                        time.perf_counter() - _start
+                    )
+                    AGENT_INFLIGHT.dec()
                     if self._redis is not None and lock_token is not None:
                         try:
                             await self._redis.eval(_LUA_COMPARE_AND_DELETE, 1, lock_key, lock_token)
                         except Exception:  # noqa: BLE001
                             pass  # best-effort release
+
+                result = "ok" if report.status == RunStatus.OK else "error"
+                AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result=result).inc()
 
                 # Surface the failure reason: a non-OK run logs at warning level WITH the
                 # error, so debugging never requires reproducing the run.

@@ -11,6 +11,7 @@ import aiosqlite
 from pydantic import BaseModel
 
 from saga_agents.core.logging import get_logger
+from saga_agents.metrics.registry import AGENT_PROPOSALS
 
 log = get_logger(__name__)
 
@@ -234,4 +235,5 @@ class SqliteProposalStore:
         if cursor.rowcount == 0:
             log.warning("proposal_status_update_no_match", proposal_id=proposal_id, status=status)
         else:
+            AGENT_PROPOSALS.labels(state=status).inc()
             log.info("proposal_status_updated", proposal_id=proposal_id, status=status)
