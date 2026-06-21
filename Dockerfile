@@ -5,16 +5,20 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 WORKDIR /app
 
-# Install dependencies first (layer-cached until pyproject/lockfile change)
+# Install dependencies first (layer-cached until pyproject/lockfile change).
+# --no-install-project: build only the dependency env here; the project itself is
+# built after its sources (and README, referenced by [project].readme) are copied.
 COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-dev --frozen || uv sync --no-dev
+RUN uv sync --no-dev --no-install-project --frozen || uv sync --no-dev --no-install-project
 
 # Copy application source and config
 COPY src ./src
 COPY config ./config
+# README.md is referenced by pyproject ([project].readme); uv needs it to build the project.
+COPY README.md ./README.md
 
 # Install the package itself (non-editable, into the existing .venv)
-RUN uv sync --no-dev --no-editable || true
+RUN uv sync --no-dev --no-editable
 
 # Point at the config file baked into the image; operators can override via
 # -e SAGA_AGENTS_CONFIG or a mounted config volume.
