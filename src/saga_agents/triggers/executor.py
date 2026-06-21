@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 import uuid
 from typing import Any
@@ -83,62 +84,58 @@ class RunExecutor:
         lock_key = f"agent:lock:{agent_id}"
         lock_token: str | None = None
 
-        async with self._global_sem:
-            async with self._agent_sems[agent_id]:
-                # Optional Redis advisory lock (cross-process deduplication).
-                if self._redis is not None:
-                    lock_token = uuid.uuid4().hex
-                    acquired: Any = await self._redis.set(  # noqa: ANN401
-                        lock_key,
-                        lock_token,
-                        nx=True,
-                        ex=definition.limits.timeout_seconds,
-                    )
-                    if not acquired:
-                        log.warning(
-                            "submit_skipped_redis_lock",
-                            agent_id=agent_id,
-                            reason=req.reason,
-                        )
-                        return
-
-                AGENT_INFLIGHT.inc()
-                _start = time.perf_counter()
-                try:
-                    report = await self._runner.run(definition)
-                except Exception as exc:  # noqa: BLE001
-                    AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result="error").inc()
-                    log.error(
-                        "run_unexpected_exception",
+        async with self._global_sem, self._agent_sems[agent_id]:
+            # Optional Redis advisory lock (cross-process deduplication).
+            if self._redis is not None:
+                lock_token = uuid.uuid4().hex
+                acquired: Any = await self._redis.set(
+                    lock_key,
+                    lock_token,
+                    nx=True,
+                    ex=definition.limits.timeout_seconds,
+                )
+                if not acquired:
+                    log.warning(
+                        "submit_skipped_redis_lock",
                         agent_id=agent_id,
                         reason=req.reason,
-                        error=str(exc),
                     )
                     return
-                finally:
-                    AGENT_RUN_DURATION.labels(agent_id=agent_id).observe(
-                        time.perf_counter() - _start
-                    )
-                    AGENT_INFLIGHT.dec()
-                    if self._redis is not None and lock_token is not None:
-                        try:
-                            await self._redis.eval(_LUA_COMPARE_AND_DELETE, 1, lock_key, lock_token)
-                        except Exception:  # noqa: BLE001
-                            pass  # best-effort release
 
-                result = "ok" if report.status == RunStatus.OK else "error"
-                AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result=result).inc()
-
-                # Surface the failure reason: a non-OK run logs at warning level WITH the
-                # error, so debugging never requires reproducing the run.
-                log_fn = log.info if report.status == RunStatus.OK else log.warning
-                log_fn(
-                    "run_completed",
+            AGENT_INFLIGHT.inc()
+            _start = time.perf_counter()
+            try:
+                report = await self._runner.run(definition)
+            except Exception as exc:
+                AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result="error").inc()
+                log.error(
+                    "run_unexpected_exception",
                     agent_id=agent_id,
                     reason=req.reason,
-                    status=report.status,
-                    tool_calls=report.tool_calls,
-                    proposals=len(report.proposals),
-                    trace_id=report.trace_id,
-                    error=report.error,
+                    error=str(exc),
                 )
+                return
+            finally:
+                AGENT_RUN_DURATION.labels(agent_id=agent_id).observe(time.perf_counter() - _start)
+                AGENT_INFLIGHT.dec()
+                if self._redis is not None and lock_token is not None:
+                    # best-effort release
+                    with contextlib.suppress(Exception):
+                        await self._redis.eval(_LUA_COMPARE_AND_DELETE, 1, lock_key, lock_token)
+
+            result = "ok" if report.status == RunStatus.OK else "error"
+            AGENT_RUNS.labels(agent_id=agent_id, trigger=req.reason, result=result).inc()
+
+            # Surface the failure reason: a non-OK run logs at warning level WITH the
+            # error, so debugging never requires reproducing the run.
+            log_fn = log.info if report.status == RunStatus.OK else log.warning
+            log_fn(
+                "run_completed",
+                agent_id=agent_id,
+                reason=req.reason,
+                status=report.status,
+                tool_calls=report.tool_calls,
+                proposals=len(report.proposals),
+                trace_id=report.trace_id,
+                error=report.error,
+            )

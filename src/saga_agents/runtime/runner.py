@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from opentelemetry import trace as otel_trace
 from pydantic_ai import Agent
@@ -56,7 +57,7 @@ class ProposalSink(Protocol):
     ) -> object: ...
 
 
-def _count_tool_calls(result: Any) -> int:
+def _count_tool_calls(result: Any) -> int:  # noqa: ANN401
     """Count non-``propose`` ToolCallPart entries across all messages.
 
     Args:
@@ -74,7 +75,7 @@ def _count_tool_calls(result: Any) -> int:
                     name = getattr(part, "tool_name", None)
                     if name != "propose":
                         count += 1
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("count_tool_calls_failed", error=str(exc))
     return count
 
@@ -223,7 +224,7 @@ class AgentRunner:
                 0,
                 f"Run exceeded {limits.timeout_seconds}s",
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # tool_calls=0: result was never assigned, so no reliable count is available
             status, summary, tool_calls, error = RunStatus.ERROR, "", 0, str(exc)
 
@@ -239,7 +240,7 @@ class AgentRunner:
                         arguments=p.arguments,
                         rationale=p.rationale,
                     )
-                except Exception as sink_exc:  # noqa: BLE001
+                except Exception as sink_exc:
                     persistence_error = str(sink_exc)
                     logger.warning(
                         "proposal_sink_add_failed",

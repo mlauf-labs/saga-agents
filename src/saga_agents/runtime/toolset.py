@@ -6,8 +6,8 @@ from typing import Any
 
 from pydantic_ai import RunContext
 from pydantic_ai.mcp import MCPServerStreamableHTTP
-from pydantic_ai.toolsets import FilteredToolset
 from pydantic_ai.tools import ToolDefinition
+from pydantic_ai.toolsets import FilteredToolset
 
 from saga_agents.config.models import ToolsSpec
 

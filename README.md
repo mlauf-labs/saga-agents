@@ -156,3 +156,23 @@ No code changes are required. The loader picks up all `*.md` files in
 | `GET` | `/agents/{agent_id}/proposals` | List pending proposals (bearer auth) |
 | `POST` | `/proposals/{id}/approve` | Approve and apply a proposal (bearer auth) |
 | `POST` | `/proposals/{id}/reject` | Reject a proposal (bearer auth) |
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the development workflow, quality gates, and
+commit conventions. In short:
+
+```bash
+uv sync
+uv run pre-commit install
+uv run pre-commit install --hook-type commit-msg
+uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
+```
+
+---
+
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE).

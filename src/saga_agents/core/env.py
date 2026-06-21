@@ -45,7 +45,7 @@ def resolve_env(value: str) -> str:
     return _ENV_PATTERN.sub(_replace, value)
 
 
-def resolve_tree(node: Any) -> Any:
+def resolve_tree(node: Any) -> Any:  # noqa: ANN401
     """Recursively resolve ``${VAR}`` tokens in a parsed YAML structure.
 
     Handles dicts, lists, and strings; other types are returned unchanged.

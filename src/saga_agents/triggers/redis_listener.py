@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from saga_agents.config.models import AgentDefinition, EventTrigger
 from saga_agents.core.logging import get_logger
@@ -143,7 +145,7 @@ class RedisListener:
                     )
                     self._states.append(state)
 
-        self._pubsub: Any | None = None  # noqa: ANN401
+        self._pubsub: Any | None = None
         self._listener_task: asyncio.Task[None] | None = None
         self._tick_task: asyncio.Task[None] | None = None
 
@@ -165,16 +167,14 @@ class RedisListener:
         for task in (self._listener_task, self._tick_task):
             if task is not None and not task.done():
                 task.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await task
-                except asyncio.CancelledError:
-                    pass
 
         if self._pubsub is not None:
             try:
                 await self._pubsub.unsubscribe(self._channel)
                 await self._pubsub.aclose()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("redis_listener_unsubscribe_error", error=str(exc))
         log.info("redis_listener_stopped", channel=self._channel)
 
@@ -195,7 +195,7 @@ class RedisListener:
                 msg: dict[str, Any] = json.loads(data)
                 topic: str = msg.get("topic", "")
                 self._handle_message(topic, msg)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("redis_listener_message_error", error=str(exc))
 
     def _handle_message(self, topic: str, msg: dict[str, Any]) -> None:
@@ -236,7 +236,7 @@ class RedisListener:
                 )
                 try:
                     await self._executor.submit(req)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     log.error(
                         "tick_loop_submit_error",
                         agent_id=state.agent_id,

@@ -14,7 +14,6 @@ from saga_agents.triggers.api import build_api
 from saga_agents.triggers.base import RunRequest
 from saga_agents.triggers.executor import RunExecutor
 
-
 # ---------------------------------------------------------------------------
 # Stubs and helpers
 # ---------------------------------------------------------------------------
@@ -26,7 +25,7 @@ class _StubExecutor:
     def __init__(self) -> None:
         self.submitted: list[RunRequest] = []
 
-    async def submit(self, req: RunRequest) -> None:  # noqa: D102
+    async def submit(self, req: RunRequest) -> None:
         self.submitted.append(req)
 
 

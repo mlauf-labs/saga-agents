@@ -72,7 +72,7 @@ async def test_submit_error_result_records_error_metric() -> None:
 
 
 async def test_submit_exception_records_error_metric() -> None:
-    """An unexpected exception from the runner increments saga_agent_runs_total with result=error."""
+    """Unexpected runner exception increments saga_agent_runs_total with result=error."""
     defn = _make_definition("agent-z")
     runner = AsyncMock()
     runner.run = AsyncMock(side_effect=RuntimeError("boom"))

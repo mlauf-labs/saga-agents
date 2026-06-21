@@ -27,7 +27,7 @@ structlog.configure(
 )
 
 
-def get_logger(name: str) -> Any:
+def get_logger(name: str) -> Any:  # noqa: ANN401
     """Return a structlog bound logger configured for JSON output.
 
     The logger name is injected as a bound context value (key ``"logger"``)

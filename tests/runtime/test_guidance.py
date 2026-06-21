@@ -42,11 +42,11 @@ def test_substitute_leaves_non_saga_text_untouched() -> None:
 
 
 def test_guidance_keys_are_the_six() -> None:
-    assert GUIDANCE_KEYS == {
+    assert {
         "store_description",
         "doctype_instructions",
         "metadata_instructions",
         "summary_instructions",
         "folder_instructions",
         "language",
-    }
+    } == GUIDANCE_KEYS

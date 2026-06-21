@@ -10,7 +10,6 @@ from saga_agents.config.models import AgentDefinition, EventTrigger
 from saga_agents.triggers.base import RunRequest
 from saga_agents.triggers.redis_listener import RedisListener
 
-
 # ---------------------------------------------------------------------------
 # Stub executor
 # ---------------------------------------------------------------------------
@@ -22,7 +21,7 @@ class StubExecutor:
     def __init__(self) -> None:
         self.calls: list[RunRequest] = []
 
-    async def submit(self, req: RunRequest) -> None:  # noqa: D102
+    async def submit(self, req: RunRequest) -> None:
         self.calls.append(req)
 
 
@@ -77,9 +76,11 @@ def test_handle_message_marks_matching_debouncer() -> None:
     assert len(listener._states) == 1
     state = listener._states[0]
 
-    assert state.debouncer._pending is False
+    pending_before = state.debouncer._pending
+    assert pending_before is False
     listener._handle_message("document.ingested", {"topic": "document.ingested"})
-    assert state.debouncer._pending is True
+    pending_after = state.debouncer._pending
+    assert pending_after is True
     assert state.last_topic == "document.ingested"
 
 
@@ -141,7 +142,7 @@ async def test_submit_error_does_not_stop_loop() -> None:
 
     call_count = 0
 
-    async def failing_submit(req: RunRequest) -> None:  # noqa: ARG001
+    async def failing_submit(req: RunRequest) -> None:
         nonlocal call_count
         call_count += 1
         raise RuntimeError("boom")

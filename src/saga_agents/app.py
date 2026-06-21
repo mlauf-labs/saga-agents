@@ -12,9 +12,11 @@ Exports:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
@@ -180,7 +182,7 @@ async def run_service(config_path: str) -> None:
     # Verify Redis is reachable at startup (non-fatal — schedule/external triggers still work).
     try:
         await redis_client.ping()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("redis_ping_failed", error=str(exc), hint="Event triggers will not fire.")
 
     # Initialise proposal store.
@@ -209,7 +211,7 @@ async def run_service(config_path: str) -> None:
     # Serve the FastAPI app.
     uv_config = uvicorn.Config(
         service.api,
-        host="0.0.0.0",  # noqa: S104
+        host="0.0.0.0",
         port=int(os.environ.get("AGENTS_PORT", "8099")),
         log_level="info",
     )
@@ -225,16 +227,14 @@ async def run_service(config_path: str) -> None:
 
         if listener_task is not None and not listener_task.done():
             listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await listener_task
-            except asyncio.CancelledError:
-                pass
 
         service.scheduler.shutdown()
 
         try:
             await redis_client.aclose()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("redis_close_error", error=str(exc))
 
 

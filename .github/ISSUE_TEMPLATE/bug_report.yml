@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a problem with saga-agents
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including expected vs. actual behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Trigger agent `…` via `POST /triggers/…`
+        2. See error …
+    validations:
+      required: true
+  - type: textarea
+    id: agent-def
+    attributes:
+      label: Agent definition (if relevant)
+      description: The `config/agents/<id>.md` frontmatter for the affected agent (redact secrets).
+      render: markdown
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log output (redact any secrets / credentials).
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: saga-agents version / commit
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker version, Redis version, LLM provider (Ollama/OpenAI), saga-core version, etc.

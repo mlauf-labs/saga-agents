@@ -12,7 +12,6 @@ from saga_agents.runtime.report import RunReport, RunStatus
 from saga_agents.triggers.base import RunRequest
 from saga_agents.triggers.executor import RunExecutor
 
-
 # ---------------------------------------------------------------------------
 # Fixtures and stubs
 # ---------------------------------------------------------------------------
@@ -313,7 +312,7 @@ async def test_redis_advisory_lock_does_not_delete_foreign_lock() -> None:
     """If the lock key is no longer owned (expired and re-acquired), eval does not delete it."""
 
     class FakeRedis:
-        """Simulates a Redis where the lock key holds a different token (re-acquired by another run)."""
+        """Redis where the lock key holds a different token (re-acquired by another run)."""
 
         def __init__(self) -> None:
             self.eval_calls: int = 0

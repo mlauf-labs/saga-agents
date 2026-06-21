@@ -16,7 +16,6 @@ from saga_agents.core.errors import GuidanceFetchError
 from saga_agents.runtime.report import RunStatus
 from saga_agents.runtime.runner import AgentRunner
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -202,7 +201,7 @@ async def test_runner_proposal_sink_failure_surfaces_in_summary(
     global_config: GlobalConfig,
     proposal_definition: AgentDefinition,
 ) -> None:
-    """Proposal-mode run where sink.add raises: status stays OK, summary contains degradation note."""
+    """Proposal-mode run where sink.add raises: status stays OK with a degradation note."""
     call_count: dict[str, int] = {"n": 0}
 
     def proposal_fn(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:

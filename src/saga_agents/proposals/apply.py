@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from saga_agents.proposals.store import ProposalRecord
 
@@ -10,7 +11,7 @@ from saga_agents.proposals.store import ProposalRecord
 async def apply_proposal(
     record: ProposalRecord,
     mcp_call: Callable[[str, dict[str, Any]], Awaitable[Any]],
-) -> Any:
+) -> Any:  # noqa: ANN401
     """Apply a proposal by invoking *mcp_call* with the recorded action and arguments.
 
     This is pure indirection: the caller injects the real MCP client (or a test fake).

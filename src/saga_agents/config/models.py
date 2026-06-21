@@ -6,7 +6,7 @@ AgentDefinition is loaded from per-agent ``*.md`` files with YAML frontmatter.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -39,7 +39,7 @@ class ExternalTrigger(BaseModel):
 
 
 Trigger = Annotated[
-    Union[EventTrigger, ScheduleTrigger, ExternalTrigger],
+    EventTrigger | ScheduleTrigger | ExternalTrigger,
     Field(discriminator="type"),
 ]
 
@@ -56,7 +56,7 @@ class ToolsSpec(BaseModel):
 
     @field_validator("write", mode="after")
     @classmethod
-    def _write_subset_of_allow(cls, write: list[str], info: Any) -> list[str]:
+    def _write_subset_of_allow(cls, write: list[str], info: Any) -> list[str]:  # noqa: ANN401
         allow: list[str] = info.data.get("allow", [])
         extra = set(write) - set(allow)
         if extra:

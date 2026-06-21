@@ -59,7 +59,7 @@ def configure_tracing(cfg: LangfuseSettings) -> bool:
         _configured = True
         return True
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         # Never leave a half-applied OTLP config behind when configuration fails.
         os.environ.pop("OTEL_EXPORTER_OTLP_ENDPOINT", None)
         os.environ.pop("OTEL_EXPORTER_OTLP_HEADERS", None)

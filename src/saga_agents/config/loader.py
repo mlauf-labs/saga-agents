@@ -13,7 +13,6 @@ from saga_agents.core.env import resolve_env, resolve_tree
 from saga_agents.core.errors import ConfigError
 from saga_agents.runtime.guidance import validate_placeholders
 
-
 # ---------------------------------------------------------------------------
 # Global config loader
 # ---------------------------------------------------------------------------
